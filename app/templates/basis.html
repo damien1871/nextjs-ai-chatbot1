@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titel %}E-Rechnung erstellen{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='stil.css') }}">
+</head>
+<body>
+  <header class="kopf">
+    <a href="/" class="marke">E-Rechnung <span>aus PDF</span></a>
+    {% if testmodus %}<span class="etikett">Test-Modus (ohne KI)</span>{% endif %}
+  </header>
+  <main>
+    {% block inhalt %}{% endblock %}
+  </main>
+  <footer class="fuss">Prototyp · Dateien werden nicht gespeichert</footer>
+</body>
+</html>

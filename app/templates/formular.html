@@ -1,0 +1,171 @@
+{% extends "basis.html" %}
+{% block titel %}Rechnung prüfen – {{ r.rechnungsnummer or dateiname }}{% endblock %}
+
+{% macro markierung(name, klasse="") -%}
+ class="{{ klasse }}{% if name in felder_fehler %} markiert-fehler{% elif name in felder_warnung %} markiert-warnung{% endif %}"
+{%- endmacro %}
+
+{% macro feld(name, beschriftung, wert, typ="text", extra="") -%}
+<label>
+  <span>{{ beschriftung }}</span>
+  <input type="{{ typ }}" name="{{ name }}" value="{{ wert }}"{{ markierung(name) }} {{ extra|safe }}>
+</label>
+{%- endmacro %}
+
+{% block inhalt %}
+<form method="post" action="/erstellen" id="formular">
+  <input type="hidden" name="pdf_b64" value="{{ pdf_b64 }}">
+  <input type="hidden" name="dateiname" value="{{ dateiname }}">
+
+  <section class="karte">
+    <h1>Daten kontrollieren</h1>
+    <p class="leise">Datei: {{ dateiname }} · Bitte vergleiche die Angaben mit deiner Rechnung und korrigiere sie, wo nötig.</p>
+
+    {% if hinweise %}
+      <div class="hinweise">
+        {% for h in hinweise if h.stufe == "fehler" %}
+          <div class="meldung fehler"><strong>Fehler:</strong> {{ h.text }}</div>
+        {% endfor %}
+        {% for h in hinweise if h.stufe == "warnung" %}
+          <div class="meldung warnung"><strong>Hinweis:</strong> {{ h.text }}</div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="meldung ok">Alles in Ordnung: Summen stimmen, alle Pflichtangaben sind vorhanden.</div>
+    {% endif %}
+  </section>
+
+  <div class="zwei-spalten">
+    <section class="karte">
+      <h2>Verkäufer (du)</h2>
+      {{ feld("verkaeufer.name", "Name / Firma", r.verkaeufer.name) }}
+      {{ feld("verkaeufer.strasse", "Straße und Hausnummer", r.verkaeufer.strasse) }}
+      <div class="reihe">
+        {{ feld("verkaeufer.plz", "PLZ", r.verkaeufer.plz) }}
+        {{ feld("verkaeufer.ort", "Ort", r.verkaeufer.ort) }}
+        {{ feld("verkaeufer.land", "Land", r.verkaeufer.land, extra='maxlength="2"') }}
+      </div>
+      {{ feld("verkaeufer.ust_id", "USt-IdNr.", r.verkaeufer.ust_id, extra='placeholder="z. B. DE123456789"') }}
+      {{ feld("verkaeufer.steuernummer", "Steuernummer", r.verkaeufer.steuernummer, extra='placeholder="z. B. 12/345/67890"') }}
+    </section>
+
+    <section class="karte">
+      <h2>Käufer (dein Kunde)</h2>
+      {{ feld("kaeufer.name", "Name / Firma", r.kaeufer.name) }}
+      {{ feld("kaeufer.strasse", "Straße und Hausnummer", r.kaeufer.strasse) }}
+      <div class="reihe">
+        {{ feld("kaeufer.plz", "PLZ", r.kaeufer.plz) }}
+        {{ feld("kaeufer.ort", "Ort", r.kaeufer.ort) }}
+        {{ feld("kaeufer.land", "Land", r.kaeufer.land, extra='maxlength="2"') }}
+      </div>
+    </section>
+  </div>
+
+  <section class="karte">
+    <h2>Rechnungsangaben</h2>
+    <div class="reihe">
+      {{ feld("rechnungsnummer", "Rechnungsnummer", r.rechnungsnummer) }}
+      {{ feld("rechnungsdatum", "Rechnungsdatum", r.rechnungsdatum, "date") }}
+      {{ feld("leistungsdatum", "Leistungsdatum", r.leistungsdatum, "date") }}
+      {{ feld("faelligkeit", "Fällig am", r.faelligkeit, "date") }}
+    </div>
+    <label>
+      <span>Zahlungsbedingungen</span>
+      <input type="text" name="zahlungsbedingungen" value="{{ r.zahlungsbedingungen }}"{{ markierung("zahlungsbedingungen") }}>
+    </label>
+    <div class="reihe">
+      {{ feld("iban", "IBAN", r.iban, extra='placeholder="DE.."') }}
+      {{ feld("bic", "BIC (freiwillig)", r.bic) }}
+    </div>
+    <label class="haken">
+      <input type="checkbox" name="kleinunternehmer" id="kleinunternehmer" {% if r.kleinunternehmer %}checked{% endif %}>
+      <span>Kleinunternehmer nach § 19 UStG (keine Umsatzsteuer)</span>
+    </label>
+  </section>
+
+  <section class="karte">
+    <h2>Positionen</h2>
+    <div class="tabelle-rahmen">
+      <table class="positionen">
+        <thead>
+          <tr>
+            <th>Beschreibung</th><th>Menge</th><th>Einheit</th><th>Einzelpreis netto €</th>
+            <th class="spalte-steuer">USt %</th><th>Gesamt laut Rechnung €</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="zeilen">
+          {% for p in r.positionen %}
+          {% set i = loop.index0 %}
+          <tr>
+            <td><input type="text" name="pos-{{ i }}-beschreibung" value="{{ p.beschreibung }}"{{ markierung('pos-%d-beschreibung' % i) }}></td>
+            <td><input type="text" inputmode="decimal" name="pos-{{ i }}-menge" value="{{ p.menge|dezimal }}" {{ markierung('pos-%d-menge' % i, "zahl") }}></td>
+            <td>
+              <select name="pos-{{ i }}-einheit"{{ markierung('pos-%d-einheit' % i) }}>
+                {% for code, name in einheiten.items() %}
+                <option value="{{ code }}" {% if code == p.einheit %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+                {% if p.einheit not in einheiten %}<option value="{{ p.einheit }}" selected>? {{ p.einheit }}</option>{% endif %}
+              </select>
+            </td>
+            <td><input type="text" inputmode="decimal" name="pos-{{ i }}-einzelpreis" value="{{ p.einzelpreis|dezimal }}" {{ markierung('pos-%d-einzelpreis' % i, "zahl") }}></td>
+            <td class="spalte-steuer">
+              <select name="pos-{{ i }}-steuersatz"{{ markierung('pos-%d-steuersatz' % i) }}>
+                {% for s in ["19", "7", "0"] %}<option value="{{ s }}" {% if s == p.steuersatz %}selected{% endif %}>{{ s }} %</option>{% endfor %}
+                {% if p.steuersatz not in ["19", "7", "0"] %}<option value="{{ p.steuersatz }}" selected>{{ p.steuersatz }} %</option>{% endif %}
+              </select>
+            </td>
+            <td><input type="text" inputmode="decimal" name="pos-{{ i }}-gesamtpreis" value="{{ p.gesamtpreis|dezimal }}" {{ markierung('pos-%d-gesamtpreis' % i, "zahl") }}></td>
+            <td><button type="button" class="knopf klein entfernen" title="Position löschen">✕</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="knopf" id="neue-zeile">+ Position hinzufügen</button>
+  </section>
+
+  <section class="karte">
+    <h2>Summen</h2>
+    <table class="summen">
+      <thead><tr><th></th><th>Laut Rechnung</th><th>Nachgerechnet</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Netto</td>
+          <td><input type="text" inputmode="decimal" name="summe_netto" value="{{ r.summe_netto|dezimal }}" {{ markierung("summe_netto", "zahl") }}></td>
+          <td class="zahl" id="calc-netto">{{ b.netto|euro }} €</td>
+        </tr>
+        <tr>
+          <td>Umsatzsteuer</td>
+          <td><input type="text" inputmode="decimal" name="summe_steuer" value="{{ r.summe_steuer|dezimal }}" {{ markierung("summe_steuer", "zahl") }}></td>
+          <td class="zahl" id="calc-steuer">{{ b.steuer|euro }} €</td>
+        </tr>
+        <tr class="fett">
+          <td>Brutto</td>
+          <td><input type="text" inputmode="decimal" name="summe_brutto" value="{{ r.summe_brutto|dezimal }}" {{ markierung("summe_brutto", "zahl") }}></td>
+          <td class="zahl" id="calc-brutto">{{ b.brutto|euro }} €</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="aktionen">
+    <a href="/" class="knopf">Andere Datei</a>
+    <button type="submit" name="aktion" value="pruefen" class="knopf">Nochmal prüfen</button>
+    <button type="submit" name="aktion" value="erstellen" class="knopf haupt" id="knopf-erstellen">E-Rechnung erstellen</button>
+  </div>
+  <p class="leise rechts" id="download-hinweis" hidden>Der Download startet gleich. Falls Fehler auftauchen, erscheinen sie hier auf der Seite.</p>
+</form>
+
+<template id="zeilen-vorlage">
+  <tr>
+    <td><input type="text" data-feld="beschreibung"></td>
+    <td><input type="text" inputmode="decimal" data-feld="menge" value="1" class="zahl"></td>
+    <td><select data-feld="einheit">{% for code, name in einheiten.items() %}<option value="{{ code }}">{{ name }}</option>{% endfor %}</select></td>
+    <td><input type="text" inputmode="decimal" data-feld="einzelpreis" class="zahl"></td>
+    <td class="spalte-steuer"><select data-feld="steuersatz"><option value="19">19 %</option><option value="7">7 %</option><option value="0">0 %</option></select></td>
+    <td><input type="text" inputmode="decimal" data-feld="gesamtpreis" class="zahl"></td>
+    <td><button type="button" class="knopf klein entfernen" title="Position löschen">✕</button></td>
+  </tr>
+</template>
+<script src="{{ url_for('static', path='formular.js') }}"></script>
+{% endblock %}

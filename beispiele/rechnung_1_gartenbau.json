@@ -1,0 +1,35 @@
+{
+  "verkaeufer": {
+    "name": "Grünwerk Garten- und Landschaftsbau GmbH",
+    "strasse": "Lindenallee 12",
+    "plz": "70173",
+    "ort": "Stuttgart",
+    "land": "DE",
+    "ust_id": "DE312456789",
+    "steuernummer": ""
+  },
+  "kaeufer": {
+    "name": "Bäckerei Hofmann KG",
+    "strasse": "Marktplatz 3",
+    "plz": "71634",
+    "ort": "Ludwigsburg",
+    "land": "DE"
+  },
+  "rechnungsnummer": "RE-2026-0147",
+  "rechnungsdatum": "2026-09-15",
+  "leistungsdatum": "2026-09-10",
+  "faelligkeit": "2026-09-29",
+  "zahlungsbedingungen": "Zahlbar innerhalb von 14 Tagen ohne Abzug.",
+  "iban": "DE89370400440532013000",
+  "bic": "COBADEFFXXX",
+  "kleinunternehmer": false,
+  "positionen": [
+    {"beschreibung": "Heckenschnitt Grundstücksgrenze", "menge": "6", "einheit": "HUR", "einzelpreis": "52.00", "steuersatz": "19", "gesamtpreis": "312.00"},
+    {"beschreibung": "Grünschnitt-Entsorgung", "menge": "1", "einheit": "LS", "einzelpreis": "85.00", "steuersatz": "19", "gesamtpreis": "85.00"},
+    {"beschreibung": "Lavendel im Topf, 3 Liter", "menge": "24", "einheit": "H87", "einzelpreis": "6.90", "steuersatz": "7", "gesamtpreis": "165.60"},
+    {"beschreibung": "Rindenmulch", "menge": "1.5", "einheit": "MTQ", "einzelpreis": "48.00", "steuersatz": "7", "gesamtpreis": "72.00"}
+  ],
+  "summe_netto": "634.60",
+  "summe_steuer": "92.06",
+  "summe_brutto": "726.66"
+}

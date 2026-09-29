@@ -1,0 +1,43 @@
+{% extends "basis.html" %}
+{% block inhalt %}
+<section class="karte">
+  <h1>Aus deiner PDF-Rechnung wird eine E-Rechnung</h1>
+  <p class="leise">ZUGFeRD 2 · Profil EN 16931 · PDF/A-3 – sieht aus wie dein Original, enthält aber die Daten für die Buchhaltung.</p>
+
+  <ol class="schritte">
+    <li><strong>PDF hochladen</strong> – z. B. aus Word erstellt</li>
+    <li><strong>Daten kontrollieren</strong> – die {% if testmodus %}App{% else %}KI{% endif %} liest alles aus, du kannst alles korrigieren</li>
+    <li><strong>E-Rechnung herunterladen</strong></li>
+  </ol>
+
+  {% if fehler %}<div class="meldung fehler" role="alert">{{ fehler }}</div>{% endif %}
+
+  <form action="/hochladen" method="post" enctype="multipart/form-data" id="upload">
+    <label class="ablage" for="datei">
+      <span class="ablage-titel">PDF auswählen</span>
+      <span class="leise" id="dateiname">oder hierher ziehen · max. 10 MB</span>
+      <input type="file" id="datei" name="datei" accept="application/pdf,.pdf" required>
+    </label>
+    <button type="submit" class="knopf haupt" id="los">Rechnung auslesen</button>
+    <p class="leise warten" hidden id="warten">Die Rechnung wird gelesen … das dauert meist 10–30 Sekunden.</p>
+  </form>
+
+  {% if testmodus %}
+  <div class="meldung info">
+    <strong>Test-Modus:</strong> Es ist kein Claude-API-Schlüssel eingetragen. Die beiden Beispiel-Rechnungen
+    aus dem Ordner <code>beispiele</code> werden trotzdem erkannt. Bei anderen PDFs bekommst du ein leeres
+    Formular zum Ausfüllen.
+  </div>
+  {% endif %}
+</section>
+<script>
+  const feld = document.getElementById("datei");
+  feld.addEventListener("change", () => {
+    document.getElementById("dateiname").textContent = feld.files[0] ? feld.files[0].name : "";
+  });
+  document.getElementById("upload").addEventListener("submit", () => {
+    document.getElementById("los").disabled = true;
+    document.getElementById("warten").hidden = false;
+  });
+</script>
+{% endblock %}
