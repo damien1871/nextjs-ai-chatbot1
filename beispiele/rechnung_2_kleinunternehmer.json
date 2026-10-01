@@ -1,0 +1,34 @@
+{
+  "verkaeufer": {
+    "name": "Lena Brandt Fotografie",
+    "strasse": "Hafenstraße 8",
+    "plz": "20457",
+    "ort": "Hamburg",
+    "land": "DE",
+    "ust_id": "",
+    "steuernummer": "43/123/45678"
+  },
+  "kaeufer": {
+    "name": "Café Seeblick GmbH",
+    "strasse": "Uferweg 21",
+    "plz": "22587",
+    "ort": "Hamburg",
+    "land": "DE"
+  },
+  "rechnungsnummer": "2026-031",
+  "rechnungsdatum": "2026-09-20",
+  "leistungsdatum": "2026-09-18",
+  "faelligkeit": "2026-10-04",
+  "zahlungsbedingungen": "Bitte überweisen Sie den Betrag innerhalb von 14 Tagen.",
+  "iban": "DE02120300000000202051",
+  "bic": "",
+  "kleinunternehmer": true,
+  "positionen": [
+    {"beschreibung": "Fotoshooting Speisekarte (halber Tag)", "menge": "1", "einheit": "LS", "einzelpreis": "390.00", "steuersatz": "0", "gesamtpreis": "390.00"},
+    {"beschreibung": "Bildbearbeitung", "menge": "25", "einheit": "H87", "einzelpreis": "8.00", "steuersatz": "0", "gesamtpreis": "200.00"},
+    {"beschreibung": "Anfahrt", "menge": "18", "einheit": "KMT", "einzelpreis": "0.30", "steuersatz": "0", "gesamtpreis": "5.40"}
+  ],
+  "summe_netto": "595.40",
+  "summe_steuer": "0.00",
+  "summe_brutto": "595.40"
+}
