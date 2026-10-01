@@ -187,29 +187,35 @@ def schematron_pruefen(xml: bytes) -> tuple[list[str], list[str]]:
     return fehler, warnungen
 
 
-def farbprofil_ergaenzen(pdf: bytes) -> bytes:
-    """PDF/A verlangt ein Farbprofil (OutputIntent). Fehlt es im Original, wird sRGB ergänzt.
-    Das Aussehen des PDFs ändert sich dadurch nicht."""
+def pdfa_vorbereiten(pdf: bytes) -> bytes:
+    """Ergänzt, was PDF/A-3 verlangt und vielen PDFs fehlt, ohne das Aussehen zu ändern:
+    ein Farbprofil (OutputIntent, z. B. bei Word ohne PDF/A-Option) und eine
+    Datei-Kennung (/ID, fehlt z. B. bei „Als PDF drucken“ in Chrome)."""
     leser = PdfReader(io.BytesIO(pdf))
     if leser.is_encrypted:
         raise ERechnungFehler(["Das PDF ist verschlüsselt oder passwortgeschützt. Bitte ein ungeschütztes PDF hochladen."])
-    if "/OutputIntents" in leser.trailer["/Root"]:
+    hat_profil = "/OutputIntents" in leser.trailer["/Root"]
+    hat_kennung = "/ID" in leser.trailer
+    if hat_profil and hat_kennung:
         return pdf
 
     schreiber = PdfWriter(clone_from=leser)
-    profil = StreamObject()
-    profil.set_data(FARBPROFIL.read_bytes())
-    profil[NameObject("/N")] = NumberObject(3)
-    absicht = DictionaryObject(
-        {
-            NameObject("/Type"): NameObject("/OutputIntent"),
-            NameObject("/S"): NameObject("/GTS_PDFA1"),
-            NameObject("/OutputConditionIdentifier"): TextStringObject("sRGB IEC61966-2.1"),
-            NameObject("/Info"): TextStringObject("sRGB IEC61966-2.1"),
-            NameObject("/DestOutputProfile"): schreiber._add_object(profil),
-        }
-    )
-    schreiber._root_object[NameObject("/OutputIntents")] = ArrayObject([schreiber._add_object(absicht)])
+    if not hat_profil:
+        profil = StreamObject()
+        profil.set_data(FARBPROFIL.read_bytes())
+        profil[NameObject("/N")] = NumberObject(3)
+        absicht = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/OutputIntent"),
+                NameObject("/S"): NameObject("/GTS_PDFA1"),
+                NameObject("/OutputConditionIdentifier"): TextStringObject("sRGB IEC61966-2.1"),
+                NameObject("/Info"): TextStringObject("sRGB IEC61966-2.1"),
+                NameObject("/DestOutputProfile"): schreiber._add_object(profil),
+            }
+        )
+        schreiber._root_object[NameObject("/OutputIntents")] = ArrayObject([schreiber._add_object(absicht)])
+    if not hat_kennung:
+        schreiber.generate_file_identifiers()
     ausgabe = io.BytesIO()
     schreiber.write(ausgabe)
     return ausgabe.getvalue()
@@ -226,7 +232,7 @@ def erstellen(r: Rechnung, original_pdf: bytes) -> Ergebnis:
     if fehler:
         raise ERechnungFehler(["Die E-Rechnung verletzt offizielle Regeln:", *fehler])
 
-    pdf_mit_profil = farbprofil_ergaenzen(original_pdf)
+    pdf_mit_profil = pdfa_vorbereiten(original_pdf)
     try:
         pdf = facturx.generate_from_binary(
             pdf_mit_profil,

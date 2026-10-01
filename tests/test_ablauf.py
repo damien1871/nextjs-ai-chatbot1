@@ -132,3 +132,31 @@ def test_deutsche_zahlen_werden_verstanden():
     daten["positionen"][3]["menge"] = "1,5"
     daten["summe_brutto"] = "726,66 €"
     assert not hat_fehler(pruefen(Rechnung.model_validate(daten)))
+
+
+def test_pdf_ohne_farbprofil_und_kennung_wird_pdfa_tauglich(tmp_path):
+    """Z. B. „Als PDF drucken“ in Chrome: kein Farbprofil (OutputIntent) und keine Datei-Kennung (/ID)."""
+    from pypdf import PdfWriter
+
+    from app.erechnung import erstellen
+
+    schreiber = PdfWriter()
+    schreiber.add_blank_page(595, 842)
+    puffer = io.BytesIO()
+    schreiber.write(puffer)
+    nackt = puffer.getvalue()
+    leser = PdfReader(io.BytesIO(nackt))
+    assert "/ID" not in leser.trailer and "/OutputIntents" not in leser.trailer["/Root"]
+
+    daten, _ = beispiel(NAMEN[0])
+    ergebnis = erstellen(Rechnung.model_validate(daten), nackt)
+    leser = PdfReader(io.BytesIO(ergebnis.pdf))
+    assert "/ID" in leser.trailer
+    assert "/OutputIntents" in leser.trailer["/Root"]
+
+    from werkzeuge.mustang_pruefen import JAR, pruefen as mustang
+
+    if shutil.which("java") and JAR.exists():
+        ziel = tmp_path / "erechnung.pdf"
+        ziel.write_bytes(ergebnis.pdf)
+        assert mustang(ziel)["gesamt"]

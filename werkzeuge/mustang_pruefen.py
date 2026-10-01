@@ -38,13 +38,10 @@ def pruefen(pdf: Path) -> dict:
         name: re.search(rf"<{name}>.*?<summary status=\"(\w+)\"", bericht, re.S)
         for name in ("pdf", "xml")
     }
-    gesamt = re.findall(r"<summary status=\"(\w+)\"/>\s*</validation>", bericht)
-    return {
-        "pdf": bool(teile["pdf"]) and teile["pdf"][1] == "valid",
-        "xml": bool(teile["xml"]) and teile["xml"][1] == "valid",
-        "gesamt": bool(gesamt) and gesamt[0] == "valid",
-        "bericht": bericht,
-    }
+    pdf_ok = bool(teile["pdf"]) and teile["pdf"][1] == "valid"
+    xml_ok = bool(teile["xml"]) and teile["xml"][1] == "valid"
+    # Achtung: Mustangs eigenes Gesamturteil ignoriert PDF/A-Fehler, darum selbst verknüpfen
+    return {"pdf": pdf_ok, "xml": xml_ok, "gesamt": pdf_ok and xml_ok, "bericht": bericht}
 
 
 if __name__ == "__main__":

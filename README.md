@@ -93,7 +93,7 @@ So lässt sich KoSIT später ergänzen, z. B. wenn ihr XRechnung für Behörden 
 - Keine Rabatte oder Zuschläge auf Rechnungsebene.
 - Kleinunternehmer ohne USt-IdNr.: Die Steuernummer wird zusätzlich als Verkäufer-Kennung eingetragen (Regel BR-CO-26 verlangt eine Kennung).
   Besser ist eine kostenlose USt-IdNr. vom Bundeszentralamt für Steuern.
-- Ob das Ergebnis PDF/A-3 ist, hängt auch vom Original ab (z. B. eingebettete Schriften). Die App ergänzt automatisch das fehlende Farbprofil.
+- Ob das Ergebnis PDF/A-3 ist, hängt auch vom Original ab (z. B. eingebettete Schriften). Die App ergänzt automatisch ein fehlendes Farbprofil und eine fehlende Datei-Kennung.
   Zur Sicherheit mit Mustang prüfen.
 
 ## 7. Nächste Schritte: die App online stellen
