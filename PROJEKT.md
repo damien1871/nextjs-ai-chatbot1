@@ -55,7 +55,7 @@ Tipp: Das GitHub-Projekt heißt noch „nextjs-ai-chatbot1“. Umbenennen geht u
 ## Wie man weitermacht (für die nächste Sitzung)
 
 1. Diese Datei und die `README.md` lesen.
-2. Tests laufen lassen: `python -m pytest`. Alle 10 müssen grün sein.
+2. Tests laufen lassen: `python -m pytest`. Alle 11 müssen grün sein.
 3. Offene Punkte: siehe Meilensteine M6–M8.
 
 ## Umsatzprognose (Stand 01.10.2026, reine Annahmen, noch keine echten Kunden)
