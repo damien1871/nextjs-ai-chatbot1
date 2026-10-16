@@ -41,3 +41,7 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /playwright/*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
