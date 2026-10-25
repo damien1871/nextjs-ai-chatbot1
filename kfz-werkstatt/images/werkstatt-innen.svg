@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <pattern id="d" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <path d="M0 0V28" stroke="#ffffff" stroke-opacity="0.04" stroke-width="10"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="800" fill="#262a31"/>
+  <rect width="1200" height="800" fill="url(#d)"/>
+  <rect x="24" y="24" width="1152" height="752" fill="none" stroke="#ff6a00" stroke-opacity="0.5" stroke-width="2" stroke-dasharray="14 10"/>
+  <g transform="translate(540 250)" fill="none" stroke="#ff6a00" stroke-width="7" stroke-linejoin="round">
+    <path d="M10 40h28l14-22h56l14 22h28a10 10 0 0 1 10 10v80a10 10 0 0 1-10 10H10A10 10 0 0 1 0 130V50a10 10 0 0 1 10-10z"/>
+    <circle cx="80" cy="88" r="30"/>
+  </g>
+  <g font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" text-anchor="middle">
+    <text x="600" y="470" fill="#ffffff" font-size="44" font-weight="800">Platzhalter: Foto Werkstatt innen</text>
+    <text x="600" y="530" fill="#b5bac2" font-size="28">Idee: Marco am Oszilloskop, Messspitzen am Motor</text>
+    <text x="600" y="580" fill="#b5bac2" font-size="24">Ersetzen durch eigenes Foto, ca. 1200 × 800 px (JPG oder WebP)</text>
+  </g>
+</svg>
