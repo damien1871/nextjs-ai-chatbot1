@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "lightning-onion": {
+      "source": "claude-dev-suite/claude-dev-suite",
+      "sourceType": "github",
+      "skillPath": "skills/bitcoin/lightning/onion/SKILL.md",
+      "computedHash": "db35ace019d0927a98e8329c83130fdcd3ce2075b2a545f65127c678d39cad71"
+    }
+  }
+}
