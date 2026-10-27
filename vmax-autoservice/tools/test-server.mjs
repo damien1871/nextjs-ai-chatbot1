@@ -30,4 +30,4 @@ createServer((req, res) => {
   if (url.pathname.startsWith('/_astro/')) h['Cache-Control'] = 'public, max-age=31536000, immutable';
   res.writeHead(gefunden ? 200 : 404, h);
   res.end(readFileSync(ziel));
-}).listen(port, () => console.log(`Testserver: http://localhost:${port}`));
+}).listen(port, '127.0.0.1', () => console.log(`Testserver: http://localhost:${port}`));

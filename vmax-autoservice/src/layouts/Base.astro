@@ -88,7 +88,7 @@ const jahr = new Date().getFullYear();
     <link rel="preload" as="font" type="font/woff2" href={fontText} crossorigin />
 
     <!-- Datenblock, kein ausführbares Script: von script-src nicht betroffen -->
-    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd).replace(/</g, '\\u003c')} />
   </head>
   <body class="pb-24 md:pb-0">
     <a
