@@ -1,0 +1,56 @@
+---
+import Base from '../layouts/Base.astro';
+import Platzhalter from '../components/Platzhalter.astro';
+import { betrieb } from '../data/betrieb';
+
+const zeile = 'grid gap-1 py-4 sm:grid-cols-3 sm:gap-6';
+const link = 'inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal';
+---
+<Base title="Impressum | V-MAX Autoservice" description="Impressum von V-MAX Autoservice, Groß-Umstadt." path="/impressum/" noindex>
+  <section class="container-seite py-16 md:py-24">
+    <h1 class="text-6xl md:text-8xl">Impressum</h1>
+
+    <p class="mt-8"><Platzhalter text="Impressum-Text aus dem Generator hier einfügen und die Felder unten ersetzen" /></p>
+
+    <dl class="mt-10 max-w-3xl divide-y divide-stahl border-y border-stahl">
+      <div class={zeile}>
+        <dt class="text-stahl-hell">Name und Rechtsform</dt>
+        <dd class="sm:col-span-2"><Platzhalter text="Name des Inhabers bzw. Firma und Rechtsform" /></dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">Anschrift</dt>
+        <dd class="sm:col-span-2">{betrieb.strasse}, {betrieb.plz} {betrieb.ort}</dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">Telefon</dt>
+        <dd class="sm:col-span-2"><a class={link} href={`tel:${betrieb.telefonHref}`}>{betrieb.telefonAnzeige}</a></dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">E-Mail</dt>
+        <dd class="sm:col-span-2">
+          {betrieb.email ? <a class={link} href={`mailto:${betrieb.email}`}>{betrieb.email}</a> : <Platzhalter text="E-Mail-Adresse" />}
+        </dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">USt-IdNr.</dt>
+        <dd class="sm:col-span-2"><Platzhalter text="USt-IdNr., falls vorhanden" /></dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">Zuständige Handwerkskammer</dt>
+        <dd class="sm:col-span-2"><Platzhalter text="Name und Anschrift der Handwerkskammer" /></dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">Berufsbezeichnung</dt>
+        <dd class="sm:col-span-2"><Platzhalter text="gesetzliche Berufsbezeichnung" /></dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">Staat der Verleihung</dt>
+        <dd class="sm:col-span-2"><Platzhalter text="Staat, in dem die Berufsbezeichnung verliehen wurde" /></dd>
+      </div>
+      <div class={zeile}>
+        <dt class="text-stahl-hell">Berufsrechtliche Regelungen</dt>
+        <dd class="sm:col-span-2"><Platzhalter text="Link zur Handwerksordnung (HwO)" /></dd>
+      </div>
+    </dl>
+  </section>
+</Base>

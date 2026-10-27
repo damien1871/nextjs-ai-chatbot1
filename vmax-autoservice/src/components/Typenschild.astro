@@ -1,0 +1,42 @@
+---
+import { betrieb } from '../data/betrieb';
+import Stern from './Stern.astro';
+import Platzhalter from './Platzhalter.astro';
+---
+<div class="relative max-w-lg rounded-sm border-2 border-papier/60 p-5 pl-6 sm:p-6 sm:pl-8">
+  <span class="niete top-2 left-2" aria-hidden="true"></span>
+  <span class="niete top-2 right-2" aria-hidden="true"></span>
+  <span class="niete bottom-2 left-2" aria-hidden="true"></span>
+  <span class="niete bottom-2 right-2" aria-hidden="true"></span>
+
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+    <p class="flex shrink-0 items-center gap-1 font-display text-7xl leading-none font-bold sm:text-8xl">
+      <span>{betrieb.bewertung.schnitt}</span><span class="sr-only"> von 5 Sternen</span>
+      <Stern class="size-10 text-signal sm:size-12" />
+    </p>
+    <div class="leading-snug">
+      <p class="font-semibold">bei Google bewertet</p>
+      <p class="text-stahl-hell">{betrieb.bewertung.anzahl} Bewertungen</p>
+      <p class="text-stahl-hell">
+        Stand: {betrieb.bewertungStand || <Platzhalter text="Datum" />}
+      </p>
+    </div>
+  </div>
+
+  <div class="mt-4 border-t border-stahl pt-3">
+    {
+      betrieb.googleProfilUrl ? (
+        <a
+          class="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal"
+          href={betrieb.googleProfilUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Profil auf Google ansehen
+        </a>
+      ) : (
+        <Platzhalter text="Link zum Google-Profil" />
+      )
+    }
+  </div>
+</div>

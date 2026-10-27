@@ -1,0 +1,27 @@
+---
+import { betrieb } from '../data/betrieb';
+
+const schritte = [
+  { titel: 'Anrufen', text: `Wählen Sie ${betrieb.telefonAnzeige} und schildern Sie kurz, was los ist. Gemeinsam finden wir einen Termin.` },
+  { titel: 'Auto bringen', text: `Kommen Sie zum Termin in die ${betrieb.strasse.replace(/ (\d+)$/, '\u00a0$1')}, ${betrieb.ort}.` },
+  { titel: 'Fertig abholen', text: 'Sobald Ihr Auto fertig ist, holen Sie es ab. Oft ist das schon am selben Tag so weit.' },
+];
+---
+<section id="ablauf" class="border-b border-stahl" aria-labelledby="h-ablauf">
+  <div class="container-seite py-16 md:py-24">
+    <h2 id="h-ablauf" class="text-6xl md:text-8xl">So läuft's ab</h2>
+
+    <ol class="mt-12 grid gap-10 lg:grid-cols-3 lg:gap-8">
+      {
+        schritte.map((s, i) => (
+          <li class="relative border-t-2 border-stahl pt-6">
+            <span class="zeichnen absolute -top-0.5 left-0 h-0.5 w-full bg-signal md:w-16" aria-hidden="true"></span>
+            <p class="font-display text-8xl leading-none font-bold text-stahl-hell" aria-hidden="true">{i + 1}</p>
+            <h3 class="mt-4 text-4xl md:text-5xl">{s.titel}</h3>
+            <p class="mt-3 text-stahl-hell">{s.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>

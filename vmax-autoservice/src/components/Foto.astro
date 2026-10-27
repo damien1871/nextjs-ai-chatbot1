@@ -1,0 +1,23 @@
+---
+import { Picture } from 'astro:assets';
+import Platzhalter from './Platzhalter.astro';
+
+interface Props {
+  /** Echtes Foto aus src/assets/photos (import). Ohne src erscheint der graue Platzhalter. */
+  src?: ImageMetadata;
+  alt?: string;
+  platzhalter: string;
+  sizes?: string;
+  class?: string;
+}
+const { src, alt = '', platzhalter, sizes = '(min-width: 1024px) 40vw, 100vw', class: cls = '' } = Astro.props;
+---
+{
+  src ? (
+    <Picture src={src} alt={alt} formats={['avif', 'webp']} widths={[480, 800, 1200]} sizes={sizes} class={cls} />
+  ) : (
+    <div class:list={['foto-platzhalter', cls]}>
+      <Platzhalter text={platzhalter} />
+    </div>
+  )
+}

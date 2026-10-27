@@ -1,0 +1,224 @@
+@import "tailwindcss";
+
+@theme {
+  --color-anthrazit: #1c1f22;
+  --color-werkbank: #262a2e;
+  --color-stahl: #3a4046;
+  --color-stahl-hell: #a9b0b6;
+  --color-papier: #ecebe4;
+  --color-signal: #f5c400;
+
+  --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --font-sans: "Barlow", Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  html {
+    background: var(--color-anthrazit);
+    color: var(--color-papier);
+    scroll-behavior: smooth;
+    scroll-padding-top: 1.5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+
+  p {
+    max-width: 62ch;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-signal);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: var(--color-signal);
+    color: var(--color-anthrazit);
+  }
+}
+
+@layer components {
+  .container-seite {
+    width: 100%;
+    max-width: 1320px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    .container-seite {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* Werkstattwand: harte Rasterlinien aus statischer SVG-Kachel, kein Verlauf */
+  .raster-flaeche {
+    background-color: var(--color-anthrazit);
+    background-image: url("/raster.svg");
+    background-size: 64px 64px;
+    background-position: -1px -1px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.25rem;
+    padding: 0.5rem 1.75rem;
+    border: 2px solid transparent;
+    border-radius: 2px;
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    text-decoration: none;
+    transition:
+      background-color 0.15s,
+      color 0.15s,
+      border-color 0.15s;
+  }
+  .btn-primaer {
+    background: var(--color-signal);
+    border-color: var(--color-signal);
+    color: var(--color-anthrazit);
+  }
+  .btn-primaer:hover {
+    background: var(--color-papier);
+    border-color: var(--color-papier);
+  }
+  .btn-sekundaer {
+    border-color: color-mix(in srgb, var(--color-papier) 65%, transparent);
+    color: var(--color-papier);
+  }
+  .btn-sekundaer:hover {
+    background: var(--color-papier);
+    border-color: var(--color-papier);
+    color: var(--color-anthrazit);
+  }
+
+  /* Sichtbarer Platzhalter */
+  .ph {
+    display: inline-block;
+    padding: 0.05em 0.45em;
+    border: 1px dashed var(--color-stahl-hell);
+    background: var(--color-werkbank);
+    color: var(--color-papier);
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .foto-platzhalter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    text-align: center;
+    background: var(--color-werkbank);
+    border: 1px solid var(--color-stahl);
+    aspect-ratio: 4 / 3;
+  }
+
+  /* Typenschild */
+  .niete {
+    position: absolute;
+    width: 0.5rem;
+    height: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--color-papier) 55%, transparent);
+    border-radius: 50%;
+  }
+
+  /* Bemaßungslinie */
+  .masslinie {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--color-stahl-hell);
+    font-size: 1rem;
+  }
+  .masslinie > i {
+    position: relative;
+    flex: 1;
+    height: 0.9rem;
+    border-inline: 1px solid var(--color-stahl-hell);
+  }
+  .masslinie > i::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--color-stahl-hell);
+  }
+
+  /* Messskala (Öffnungszeiten) */
+  .skala {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    height: 0.9rem;
+    border-left: 1px solid var(--color-stahl-hell);
+  }
+  .skala > span {
+    border-right: 1px solid var(--color-stahl);
+  }
+  .skala > span:last-child {
+    border-right-color: var(--color-stahl-hell);
+  }
+  .skala > b {
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: 0.4rem;
+    margin-top: -0.2rem;
+    background: var(--color-stahl-hell);
+  }
+}
+
+/* Einzige Bewegung: Linien zeichnen sich beim Einscrollen.
+   Reines CSS, nur ohne Reduced-Motion, nur wo animation-timeline unterstützt wird. */
+@keyframes zeichnen {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .masslinie > i::after,
+    .skala > b,
+    .zeichnen {
+      transform-origin: left center;
+      /* Bewusst als Einzel-Eigenschaften (ohne duration/delay/…): der Minifier würde sonst zur
+         Kurzschreibweise "animation: … view()" zusammenfassen, die Browser nicht parsen. */
+      animation-name: zeichnen;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 100%;
+    }
+  }
+}

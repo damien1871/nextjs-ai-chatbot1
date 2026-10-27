@@ -1,0 +1,32 @@
+---
+const punkte = [
+  {
+    titel: 'Kurzfristig',
+    text: 'Das Auto macht Probleme, und es eilt? Rufen Sie an. Einen Termin bekommen Sie bei uns oft sehr schnell.',
+  },
+  {
+    titel: 'Oft noch am selben Tag',
+    text: 'Viele Reparaturen sind erledigt, bevor der Tag um ist. Fehlt ein Teil, bestellen wir es schnell.',
+  },
+  {
+    titel: 'Faire Preise',
+    text: 'Fair kalkuliert: Das hören wir in den Bewertungen immer wieder, und so soll es bleiben.',
+  },
+];
+---
+<section id="warum" class="border-b border-stahl bg-werkbank" aria-labelledby="h-warum">
+  <div class="container-seite py-16 md:py-24">
+    <h2 id="h-warum" class="max-w-4xl text-5xl md:text-7xl">Warum Kundschaft aus der Umgebung zu uns kommt</h2>
+
+    <div class="mt-12 grid gap-10 lg:grid-cols-3 lg:gap-0">
+      {
+        punkte.map((p) => (
+          <div class="border-t border-stahl-hell/50 pt-6 lg:border-t-0 lg:border-l lg:px-8 lg:pt-0 lg:first:border-l-0 lg:first:pl-0">
+            <h3 class="text-5xl md:text-6xl">{p.titel}</h3>
+            <p class="mt-4 text-stahl-hell">{p.text}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

@@ -1,0 +1,11 @@
+---
+interface Props {
+  label: string;
+  class?: string;
+}
+const { label, class: cls = '' } = Astro.props;
+---
+<!-- Dekorativ: wiederholt nur Text, der an anderer Stelle schon steht -->
+<div class:list={['masslinie', cls]} aria-hidden="true">
+  <i></i><span>{label}</span><i></i>
+</div>

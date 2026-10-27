@@ -1,0 +1,24 @@
+---
+import Platzhalter from './Platzhalter.astro';
+
+const leistungen = ['Inspektion', 'Reparatur', 'Fehlerdiagnose', 'Bremsen', 'Reifen', 'Klimaservice'];
+---
+<section id="leistungen" class="border-b border-stahl" aria-labelledby="h-leistungen">
+  <div class="container-seite py-16 md:py-24">
+    <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <h2 id="h-leistungen" class="text-6xl md:text-8xl">Leistungen</h2>
+      <p><Platzhalter text="Einleitung und genaue Leistungen vom Inhaber bestätigen" /></p>
+    </div>
+
+    <ul class="mt-10 grid border-t border-l border-stahl sm:grid-cols-2 lg:grid-cols-3">
+      {
+        leistungen.map((name) => (
+          <li class="flex min-h-48 flex-col justify-between gap-10 border-r border-b border-stahl p-6">
+            <p><Platzhalter text="vom Inhaber bestätigen" /></p>
+            <h3 class="text-4xl md:text-5xl">{name}</h3>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>

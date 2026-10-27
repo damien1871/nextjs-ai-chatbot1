@@ -1,0 +1,44 @@
+---
+import { betrieb, routeUrl } from '../data/betrieb';
+
+// Hausnummer nicht von der Straße trennen
+const strasse = betrieb.strasse.replace(/ (\d+)$/, '\u00a0$1');
+import Typenschild from './Typenschild.astro';
+import Foto from './Foto.astro';
+import Masslinie from './Masslinie.astro';
+---
+<section class="raster-flaeche border-b border-stahl" aria-labelledby="titel">
+  <div class="container-seite pt-10 pb-14 md:pt-16 md:pb-20">
+    <h1 id="titel">
+      <span
+        class="block text-[clamp(3.5rem,19vw,4.75rem)] leading-[0.88] md:text-[clamp(5rem,11vw,10rem)]"
+      >
+        <span class="block md:inline">V-MAX</span> Autoservice
+      </span>
+      <span class="mt-4 block text-[clamp(1.75rem,6vw,3rem)] leading-[1] font-semibold md:mt-6">
+        Ihre freie Werkstatt in Groß-Umstadt
+      </span>
+    </h1>
+
+    <Masslinie class="mt-8 md:mt-10" label={`${betrieb.zusatz}, ${betrieb.ort}`} />
+
+    <div class="mt-10 grid gap-10 lg:grid-cols-12 lg:gap-14">
+      <div class="min-w-0 lg:col-span-7">
+        <p class="text-xl">
+          Freie Kfz-Werkstatt im {betrieb.zusatz}, {strasse}. Geöffnet Montag bis Samstag,
+          9:00 bis 18:00 Uhr.
+        </p>
+        <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+          <a href={`tel:${betrieb.telefonHref}`} class="btn btn-primaer">Jetzt anrufen</a>
+          <a href={routeUrl} class="btn btn-sekundaer" target="_blank" rel="noopener noreferrer">Route planen</a>
+        </div>
+        <div class="mt-10">
+          <Typenschild />
+        </div>
+      </div>
+      <div class="min-w-0 lg:col-span-5">
+        <Foto platzhalter="Foto der Werkstatt, außen oder Werkstattbereich" class="aspect-video lg:aspect-[4/3]" />
+      </div>
+    </div>
+  </div>
+</section>
