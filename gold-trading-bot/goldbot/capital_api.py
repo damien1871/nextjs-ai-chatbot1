@@ -179,6 +179,12 @@ class CapitalClient:
             body["profitLevel"] = profit_level
         return self._request("POST", "/positions", json=body)["dealReference"]
 
+    def update_position(self, deal_id: str, stop_level: float, profit_level: float | None = None) -> str:
+        body: dict[str, Any] = {"stopLevel": stop_level}
+        if profit_level is not None:
+            body["profitLevel"] = profit_level  # mitsenden, damit das Gewinnziel erhalten bleibt
+        return self._request("PUT", f"/positions/{deal_id}", json=body).get("dealReference", "")
+
     def close_position(self, deal_id: str) -> str:
         return self._request("DELETE", f"/positions/{deal_id}").get("dealReference", "")
 

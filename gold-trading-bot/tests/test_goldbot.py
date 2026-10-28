@@ -156,7 +156,7 @@ def _settings(tmp_path) -> Settings:
         api_key="k", identifier="i", password="p", environment="demo", live_confirmed=False, epic="GOLD",
         resolution="HOUR", risk_per_trade=0.01, max_daily_loss=0.03, max_open_positions=1, size_step=0.01,
         price_decimals=2, poll_seconds=1, journal_path=str(tmp_path / "trades.csv"),
-        log_path=str(tmp_path / "bot.log"), strategy=StrategyParams(),
+        log_path=str(tmp_path / "bot.log"), strategy=StrategyParams(), news_filter=False,
     )
 
 

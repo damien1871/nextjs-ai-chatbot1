@@ -14,6 +14,10 @@ def _get(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
+def _split(value: str, norm) -> list[str]:
+    return [norm(v.strip()) for v in value.split(",") if v.strip()]
+
+
 @dataclass
 class Settings:
     api_key: str
@@ -32,6 +36,12 @@ class Settings:
     journal_path: str
     log_path: str
     strategy: StrategyParams
+    news_filter: bool = True
+    news_minutes_before: int = 60
+    news_minutes_after: int = 30
+    news_currencies: frozenset = frozenset({"USD"})
+    news_impacts: frozenset = frozenset({"High"})
+    news_history_path: str = "data/calendar_events.csv"
 
     @classmethod
     def load(cls, env_file: str = ".env") -> "Settings":
@@ -57,7 +67,15 @@ class Settings:
                 adx_min=float(_get("ADX_MIN", "20")),
                 atr_stop_mult=float(_get("ATR_STOP_MULT", "2.0")),
                 atr_target_mult=float(_get("ATR_TARGET_MULT", "3.0")),
+                trailing_atr_mult=float(_get("TRAILING_ATR_MULT", "0")),
+                max_hold_bars=int(_get("MAX_HOLD_BARS", "0")),
+                session_range_max=float(_get("SESSION_RANGE_MAX", "0.35")),
             ),
+            news_filter=_get("NEWS_FILTER", "ON").upper() in ("ON", "YES", "TRUE", "1"),
+            news_minutes_before=int(_get("NEWS_MINUTES_BEFORE", "60")),
+            news_minutes_after=int(_get("NEWS_MINUTES_AFTER", "30")),
+            news_currencies=frozenset(_split(_get("NEWS_CURRENCIES", "USD"), str.upper)),
+            news_impacts=frozenset(_split(_get("NEWS_IMPACT", "High"), str.capitalize)),
         )
         s.validate()
         return s

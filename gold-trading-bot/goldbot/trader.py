@@ -1,7 +1,10 @@
 """Der eigentliche Bot: wartet auf jede neue abgeschlossene Kerze, prüft die
 Strategie und eröffnet bei einem Signal eine Position mit Stop-Loss und
 Take-Profit. Stop und Ziel liegen beim Broker – sie greifen also auch, wenn der
-Bot oder dein Computer ausfällt."""
+Bot oder dein Computer ausfällt.
+
+Zusätzlich: keine neuen Trades rund um wichtige US-Termine (Wirtschaftskalender),
+optional nachziehender Stop (Trailing) und Ausstieg nach x Kerzen."""
 
 from __future__ import annotations
 
@@ -11,13 +14,16 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 
+import pandas as pd
 import requests
 
+from . import indicators as ind
 from .capital_api import CapitalAPIError, CapitalClient
 from .config import Settings
 from .data import RESOLUTION_MINUTES, prices_to_frame
+from .news_calendar import EventCalendar, LiveNewsCalendar
 from .risk import DailyLossGuard, position_size
-from .strategy import latest_signal
+from .strategy import latest_signal, trailing_stop
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +33,9 @@ JOURNAL_FIELDS = [
 
 
 class GoldTrader:
-    def __init__(self, client: CapitalClient, settings: Settings, dry_run: bool = False):
+    def __init__(
+        self, client: CapitalClient, settings: Settings, dry_run: bool = False, calendar: EventCalendar | None = None
+    ):
         self.client = client
         self.s = settings
         self.p = settings.strategy
@@ -38,6 +46,12 @@ class GoldTrader:
         self.min_size = settings.size_step
         self.account_ccy = "USD"
         self.quote_ccy = "USD"
+        if calendar is None and settings.news_filter:
+            calendar = LiveNewsCalendar(
+                settings.news_minutes_before, settings.news_minutes_after, set(settings.news_currencies),
+                set(settings.news_impacts), history_path=settings.news_history_path,
+            )
+        self.calendar = calendar
 
     # ----------------------------------------------------------------- Setup
     def setup(self) -> None:
@@ -71,8 +85,7 @@ class GoldTrader:
     # ------------------------------------------------------------------ Logik
     def tick(self, now: datetime | None = None) -> None:
         now = now or datetime.now(timezone.utc)
-        count = min(1000, self.p.warmup + 100)
-        df = prices_to_frame(self.client.get_prices(self.s.epic, self.s.resolution, count))
+        df = prices_to_frame(self.client.get_prices(self.s.epic, self.s.resolution, 1000))
         # Die letzte Kerze ist meist noch nicht fertig -> verwerfen
         if len(df) and df["time"].iloc[-1] + self.bar > now:
             df = df.iloc[:-1]
@@ -97,6 +110,7 @@ class GoldTrader:
                  f"{signal.direction} ({signal.reason})" if signal else "keins")
 
         positions = [p for p in self.client.get_positions() if p.get("market", {}).get("epic") == self.s.epic]
+        positions = self._manage_positions(df, positions)
         account = self.client.get_active_account()
         equity = float(account["balance"]["balance"])
         allowed = self.guard.allows_trading(equity, now.date())
@@ -113,7 +127,49 @@ class GoldTrader:
             log.warning("Signal ignoriert: Tagesverlust-Limit (%.1f %%) erreicht – Pause bis morgen (UTC)",
                         self.s.max_daily_loss * 100)
             return
+        event = self.calendar.blocking_event(now) if self.calendar else None
+        if event is not None:
+            log.warning("Signal ignoriert: wichtiger Termin '%s' (%s) um %s UTC – Sperrfenster %d min davor / %d min danach",
+                        event.title, event.country, f"{event.time:%d.%m. %H:%M}",
+                        self.s.news_minutes_before, self.s.news_minutes_after)
+            return
         self._open(signal, equity)
+
+    def _manage_positions(self, df: pd.DataFrame, positions: list[dict]) -> list[dict]:
+        """Zeit-Ausstieg und Trailing-Stop für offene Positionen. Gibt die noch offenen zurück."""
+        if not (self.p.max_hold_bars or self.p.trailing_atr_mult > 0) or not positions:
+            return positions
+        last_close_time = df["time"].iloc[-1] + self.bar
+        atr_now = float(ind.atr(df, self.p.atr_period).iloc[-1])
+        remaining = []
+        for item in positions:
+            pos = item["position"]
+            deal_id, direction = pos["dealId"], pos["direction"]
+            opened = pd.Timestamp(pos["createdDateUTC"])
+            opened = opened.tz_localize("UTC") if opened.tzinfo is None else opened.tz_convert("UTC")
+            bars_held = int((last_close_time - opened) / self.bar)
+
+            if self.p.max_hold_bars and bars_held >= self.p.max_hold_bars:
+                log.info("Zeitablauf: Position %s ist %d Kerzen offen -> schließen%s",
+                         deal_id, bars_held, " [DRY-RUN]" if self.dry_run else "")
+                if not self.dry_run:
+                    self.client.close_position(deal_id)
+                continue
+
+            current = pos.get("stopLevel")
+            if self.p.trailing_atr_mult > 0 and current is not None:
+                closes = df.loc[df["time"] >= opened.floor(self.bar), "close"]
+                if len(closes):
+                    best = closes.max() if direction == "BUY" else closes.min()
+                    new = round(trailing_stop(direction, best, atr_now, float(current), self.p.trailing_atr_mult),
+                                self.s.price_decimals)
+                    if abs(new - float(current)) >= 10 ** -self.s.price_decimals:
+                        log.info("Trailing-Stop %s: %.2f -> %.2f%s", deal_id, float(current), new,
+                                 " [DRY-RUN]" if self.dry_run else "")
+                        if not self.dry_run:
+                            self.client.update_position(deal_id, new, pos.get("profitLevel"))
+            remaining.append(item)
+        return remaining
 
     def _open(self, signal, equity: float) -> None:
         snap = self.client.get_market(self.s.epic).get("snapshot", {})
@@ -131,7 +187,9 @@ class GoldTrader:
         sign = 1 if signal.direction == "BUY" else -1
         ref = float(snap["offer"] if sign == 1 else snap["bid"])
         stop = round(ref - sign * signal.stop_distance, self.s.price_decimals)
-        target = round(ref + sign * signal.target_distance, self.s.price_decimals)
+        target = (
+            round(ref + sign * signal.target_distance, self.s.price_decimals) if signal.target_distance > 0 else None
+        )
         row = {
             "time_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "mode": "dry-run" if self.dry_run else self.client.environment,
@@ -140,8 +198,8 @@ class GoldTrader:
         }
         if self.dry_run:
             row["status"] = "NICHT GESENDET"
-            log.info("[DRY-RUN] würde %s %s x %s @ ~%.2f | SL %.2f | TP %.2f",
-                     signal.direction, size, self.s.epic, ref, stop, target)
+            log.info("[DRY-RUN] würde %s %s x %s @ ~%.2f | SL %.2f | TP %s",
+                     signal.direction, size, self.s.epic, ref, stop, target or "keins")
         else:
             ref_id = self.client.open_position(self.s.epic, signal.direction, size, stop, target)
             time.sleep(1)
@@ -149,8 +207,9 @@ class GoldTrader:
             deals = conf.get("affectedDeals") or [{}]
             row.update(deal_reference=ref_id, deal_id=deals[0].get("dealId", conf.get("dealId", "")),
                        status=conf.get("dealStatus", "?"))
-            log.info("ORDER %s %s x %s @ ~%.2f | SL %.2f | TP %.2f | Status %s (%s)",
-                     signal.direction, size, self.s.epic, ref, stop, target, row["status"], conf.get("reason", ""))
+            log.info("ORDER %s %s x %s @ ~%.2f | SL %.2f | TP %s | Status %s (%s)",
+                     signal.direction, size, self.s.epic, ref, stop, target or "keins", row["status"],
+                     conf.get("reason", ""))
         self._journal(row)
 
     def _journal(self, row: dict) -> None:
@@ -166,6 +225,12 @@ class GoldTrader:
     # ---------------------------------------------------------------- Schleife
     def run_forever(self) -> None:
         self.setup()
+        if self.calendar is not None:
+            log.info("Wirtschaftskalender-Filter AN: keine neuen Trades %d min vor bis %d min nach %s-Terminen (%s)",
+                     self.s.news_minutes_before, self.s.news_minutes_after,
+                     "/".join(sorted(self.s.news_impacts)), ", ".join(sorted(self.s.news_currencies)))
+        else:
+            log.info("Wirtschaftskalender-Filter AUS")
         log.info("Bot läuft. Prüfe alle %d Sekunden auf neue Kerzen. Beenden mit Strg+C.", self.s.poll_seconds)
         failures = 0
         while True:

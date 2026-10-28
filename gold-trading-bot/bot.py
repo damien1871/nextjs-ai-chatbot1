@@ -2,6 +2,7 @@
 """Gold-Trading-Bot – Kommandozeile.
 
   python bot.py check                      Verbindung + Kontostand + Goldkurs prüfen
+  python bot.py news                       Wichtige Wirtschaftstermine dieser Woche anzeigen
   python bot.py download --days 730        Historische Kurse als CSV speichern
   python bot.py backtest --data data/gold_HOUR.csv
   python bot.py optimize --data data/gold_HOUR.csv
@@ -23,7 +24,9 @@ from goldbot.backtest import BacktestConfig, format_stats, run_backtest
 from goldbot.capital_api import CapitalAPIError, CapitalClient
 from goldbot.config import Settings
 from goldbot.data import fetch_history, load_csv, save_csv, synthetic_gold
+from goldbot.news_calendar import LiveNewsCalendar, backtest_calendar
 from goldbot.optimize import optimize
+from goldbot.strategy import STRATEGIES
 from goldbot.trader import GoldTrader
 
 log = logging.getLogger("goldbot")
@@ -89,11 +92,41 @@ def cmd_download(args, s: Settings) -> None:
 
 
 def _bt_config(args, s: Settings) -> BacktestConfig:
-    return BacktestConfig(initial_equity=args.equity, risk_per_trade=s.risk_per_trade, max_daily_loss=s.max_daily_loss)
+    calendar = None
+    if s.news_filter and not args.no_news:
+        calendar = backtest_calendar(s.news_minutes_before, s.news_minutes_after, s.news_history_path,
+                                     set(s.news_currencies))
+    return BacktestConfig(initial_equity=args.equity, risk_per_trade=s.risk_per_trade,
+                          max_daily_loss=s.max_daily_loss, calendar=calendar)
 
 
 def _params(args, s: Settings):
-    return replace(s.strategy, strategy=args.strategy) if args.strategy else s.strategy
+    changes = {}
+    if getattr(args, "strategy", None):
+        changes["strategy"] = args.strategy
+    if getattr(args, "trailing", None) is not None:
+        changes["trailing_atr_mult"] = args.trailing
+    if getattr(args, "max_hold", None) is not None:
+        changes["max_hold_bars"] = args.max_hold
+    return replace(s.strategy, **changes)
+
+
+def cmd_news(args, s: Settings) -> None:
+    cal = LiveNewsCalendar(s.news_minutes_before, s.news_minutes_after, set(s.news_currencies),
+                           set(s.news_impacts), history_path=s.news_history_path)
+    cal.refresh(force=True)
+    now = pd.Timestamp.now(tz="UTC")
+    upcoming = [e for e in cal.events if now - pd.Timedelta(days=1) <= e.time <= now + pd.Timedelta(days=14)]
+    print(f"\nWichtige Termine ({'/'.join(sorted(s.news_impacts))}, {', '.join(sorted(s.news_currencies))}) "
+          f"– Sperrfenster {s.news_minutes_before} min davor bis {s.news_minutes_after} min danach:\n")
+    for e in upcoming:
+        local = e.time.tz_convert("Europe/Berlin")
+        weekday = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][local.weekday()]
+        print(f"  {weekday} {local:%d.%m. %H:%M} (dt. Zeit)  {e.country:<4} {e.title}")
+    if not upcoming:
+        print("  keine")
+    blocked = cal.blocking_event(now)
+    print(f"\nJetzt gesperrt: {'JA – ' + blocked.title if blocked else 'nein'}\n")
 
 
 def cmd_backtest(args, s: Settings) -> None:
@@ -103,7 +136,13 @@ def cmd_backtest(args, s: Settings) -> None:
     os.makedirs("results", exist_ok=True)
     res.trades.to_csv("results/trades.csv", index=False)
     res.equity.to_csv("results/equity.csv")
-    print(f"\nBacktest – Strategie '{params.strategy}', {len(df)} Kerzen")
+    extras = []
+    if params.trailing_atr_mult > 0:
+        extras.append(f"Trailing {params.trailing_atr_mult} ATR")
+    if params.max_hold_bars:
+        extras.append(f"max. {params.max_hold_bars} Kerzen")
+    extras.append("Kalender-Filter AN" if _bt_config(args, s).calendar else "Kalender-Filter AUS")
+    print(f"\nBacktest – Strategie '{params.strategy}', {len(df)} Kerzen ({', '.join(extras)})")
     print(format_stats(res.stats))
     print("\nEinzelne Trades: results/trades.csv | Kontoverlauf: results/equity.csv")
     if args.plot:
@@ -126,14 +165,14 @@ def _plot(equity: pd.Series) -> None:
 def cmd_optimize(args, s: Settings) -> None:
     df = load_data(args, s)
     print(f"Teste {len(df)} Kerzen – das dauert ein paar Minuten ...")
-    table = optimize(df, s.strategy, _bt_config(args, s))
+    table = optimize(df, _params(args, s), _bt_config(args, s))
     with pd.option_context("display.width", 200, "display.max_columns", 20):
         print("\nTop 5 Parameter (gefunden auf den ersten 70 %, geprüft auf den letzten 30 % der Daten):\n")
         print(table.to_string(index=False))
     print(
         "\nSo liest du das: Wichtig sind die 'Test'-Spalten. Nimm nur Einstellungen, die auch im Test"
         "\npositiv sind und einen erträglichen Drawdown haben. Übernimm sie in deine .env"
-        "\n(STRATEGY, ADX_MIN, ATR_STOP_MULT, ATR_TARGET_MULT)."
+        "\n(STRATEGY, ADX_MIN, ATR_STOP_MULT, ATR_TARGET_MULT, TRAILING_ATR_MULT)."
     )
 
 
@@ -150,6 +189,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("check", help="Verbindung und Konto prüfen")
+    sub.add_parser("news", help="Wichtige Wirtschaftstermine anzeigen")
 
     p = sub.add_parser("download", help="Historische Kurse speichern")
     p.add_argument("--days", type=int, default=730)
@@ -163,8 +203,11 @@ def main() -> None:
         src.add_argument("--synthetic", action="store_true", help="Künstliche Testdaten (ohne Konto)")
         p.add_argument("--days", type=int, default=730, help="Tage direkt von der API laden (wenn kein --data)")
         p.add_argument("--equity", type=float, default=10_000.0, help="Startkapital für den Backtest")
+        p.add_argument("--no-news", action="store_true", help="Wirtschaftskalender-Filter im Backtest abschalten")
         if name == "backtest":
-            p.add_argument("--strategy", choices=["trend_pullback", "breakout"])
+            p.add_argument("--strategy", choices=sorted(STRATEGIES))
+            p.add_argument("--trailing", type=float, help="Trailing-Stop in ATR (0 = aus)")
+            p.add_argument("--max-hold", type=int, help="Position nach x Kerzen schließen (0 = aus)")
             p.add_argument("--plot", action="store_true", help="Kontoverlauf als PNG speichern")
 
     p = sub.add_parser("run", help="Bot starten")
@@ -174,7 +217,7 @@ def main() -> None:
     s = Settings.load(args.env_file)
     setup_logging(s.log_path if args.cmd == "run" else None)
     try:
-        {"check": cmd_check, "download": cmd_download, "backtest": cmd_backtest,
+        {"check": cmd_check, "news": cmd_news, "download": cmd_download, "backtest": cmd_backtest,
          "optimize": cmd_optimize, "run": cmd_run}[args.cmd](args, s)
     except CapitalAPIError as exc:
         log.error("Capital.com meldet einen Fehler: %s", exc)

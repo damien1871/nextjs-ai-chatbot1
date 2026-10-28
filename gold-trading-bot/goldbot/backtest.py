@@ -6,6 +6,8 @@ Regeln, damit das Ergebnis nicht geschönt ist:
 - Werden Stop UND Ziel in derselben Kerze berührt, zählt der Stop (pessimistisch).
 - Öffnet der Markt mit einer Lücke hinter dem Stop, wird zum schlechteren Kurs ausgestiegen.
 - Übernachtgebühren für CFDs werden grob berücksichtigt.
+- Optional: keine Einstiege rund um wichtige US-Termine (Wirtschaftskalender),
+  nachziehender Stop (Trailing) und Ausstieg nach x Kerzen.
 """
 
 from __future__ import annotations
@@ -15,8 +17,9 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from .news_calendar import EventCalendar
 from .risk import DailyLossGuard, position_size
-from .strategy import StrategyParams, add_indicators, signal_at
+from .strategy import StrategyParams, add_indicators, signal_at, trailing_stop
 
 
 @dataclass
@@ -28,6 +31,7 @@ class BacktestConfig:
     min_size: float = 0.01
     size_step: float = 0.01
     overnight_rate_annual: float = 0.03  # grobe Schätzung der CFD-Finanzierungskosten
+    calendar: EventCalendar | None = None  # Wirtschaftskalender-Filter
 
 
 @dataclass
@@ -42,6 +46,7 @@ def run_backtest(df: pd.DataFrame, p: StrategyParams, cfg: BacktestConfig | None
     data = add_indicators(df.reset_index(drop=True), p)
     spread = data["spread"].fillna(cfg.default_spread).to_numpy()
     o, h, l, c = (data[k].to_numpy() for k in ("open", "high", "low", "close"))
+    atr_values = data["atr"].to_numpy()
     times = data["time"]
 
     equity = cfg.initial_equity
@@ -50,6 +55,7 @@ def run_backtest(df: pd.DataFrame, p: StrategyParams, cfg: BacktestConfig | None
     pending = None
     trades: list[dict] = []
     curve = np.empty(len(data))
+    news_skipped = 0
 
     for i in range(len(data)):
         half = spread[i] / 2
@@ -58,8 +64,10 @@ def run_backtest(df: pd.DataFrame, p: StrategyParams, cfg: BacktestConfig | None
         if pending is not None and pos is None:
             sig = pending
             entry = o[i] + half if sig.direction == "BUY" else o[i] - half
+            blocked = cfg.calendar.blocking_event(times[i]) if cfg.calendar else None
+            news_skipped += blocked is not None
             size = position_size(equity, cfg.risk_per_trade, sig.stop_distance, cfg.min_size, cfg.size_step)
-            if size > 0:
+            if size > 0 and blocked is None:
                 sign = 1 if sig.direction == "BUY" else -1
                 pos = {
                     "direction": sig.direction,
@@ -68,7 +76,9 @@ def run_backtest(df: pd.DataFrame, p: StrategyParams, cfg: BacktestConfig | None
                     "entry": entry,
                     "size": size,
                     "stop": entry - sign * sig.stop_distance,
-                    "target": entry + sign * sig.target_distance,
+                    "target": entry + sign * sig.target_distance if sig.target_distance > 0 else None,
+                    "best_close": entry,
+                    "bars": 0,
                     "risk": sig.stop_distance * size,
                     "reason": sig.reason,
                 }
@@ -84,20 +94,28 @@ def run_backtest(df: pd.DataFrame, p: StrategyParams, cfg: BacktestConfig | None
                     exit_price, why = exit_open, "Stop (Gap)"
                 elif exit_low <= pos["stop"]:
                     exit_price, why = pos["stop"], "Stop"
-                elif exit_high >= pos["target"]:
+                elif pos["target"] is not None and exit_high >= pos["target"]:
                     exit_price, why = pos["target"], "Ziel"
             else:
                 if exit_open >= pos["stop"]:
                     exit_price, why = exit_open, "Stop (Gap)"
                 elif exit_high >= pos["stop"]:
                     exit_price, why = pos["stop"], "Stop"
-                elif exit_low <= pos["target"]:
+                elif pos["target"] is not None and exit_low <= pos["target"]:
                     exit_price, why = pos["target"], "Ziel"
+            pos["bars"] += 1
+            if exit_price is None and p.max_hold_bars and pos["bars"] >= p.max_hold_bars:
+                exit_price, why = c[i] - s * half, "Zeitablauf"
             if exit_price is None and i == len(data) - 1:
                 exit_price, why = c[i] - s * half, "Ende Backtest"
             if exit_price is not None:
                 equity += _close_trade(pos, exit_price, times[i], why, cfg, trades)
                 pos = None
+            else:
+                # Trailing-Stop nach Kerzenschluss nachziehen (gilt ab der nächsten Kerze)
+                best = max(pos["best_close"], c[i]) if s == 1 else min(pos["best_close"], c[i])
+                pos["best_close"] = best
+                pos["stop"] = trailing_stop(pos["direction"], best, atr_values[i], pos["stop"], p.trailing_atr_mult)
 
         # 3) Kontostand inkl. offener Position
         unrealized = 0.0 if pos is None else (c[i] - pos["sign"] * half - pos["entry"]) * pos["sign"] * pos["size"]
@@ -109,7 +127,10 @@ def run_backtest(df: pd.DataFrame, p: StrategyParams, cfg: BacktestConfig | None
 
     trades_df = pd.DataFrame(trades)
     equity_series = pd.Series(curve, index=times, name="equity")
-    return BacktestResult(trades_df, equity_series, compute_stats(trades_df, equity_series, data, cfg))
+    stats = compute_stats(trades_df, equity_series, data, cfg)
+    if cfg.calendar is not None:
+        stats["Wegen Terminen ausgelassen"] = news_skipped
+    return BacktestResult(trades_df, equity_series, stats)
 
 
 def _close_trade(pos: dict, exit_price: float, when, why: str, cfg: BacktestConfig, trades: list) -> float:
@@ -125,8 +146,8 @@ def _close_trade(pos: dict, exit_price: float, when, why: str, cfg: BacktestConf
             "size": pos["size"],
             "entry": round(pos["entry"], 3),
             "exit": round(exit_price, 3),
-            "stop": round(pos["stop"], 3),
-            "target": round(pos["target"], 3),
+            "stop": round(pos["stop"], 3),  # letzter Stand (inkl. Trailing)
+            "target": round(pos["target"], 3) if pos["target"] is not None else None,
             "pnl": round(pnl, 2),
             "r_multiple": round(pnl / pos["risk"], 2) if pos["risk"] else 0.0,
             "exit_reason": why,

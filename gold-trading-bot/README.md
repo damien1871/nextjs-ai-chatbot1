@@ -46,7 +46,16 @@ Gut zu wissen über Capital.com:
 
 ## 2. Wie der Bot handelt
 
-Der Bot kennt zwei Strategien. Beide handeln **nur in Trendrichtung** und nur, wenn der Trend stark genug ist (ADX).
+Der Bot kennt drei Strategien. Welche bei dir am besten passt, findest du mit dem Backtest heraus (Schritt 6 und 7).
+
+> **Was die Recherche ergeben hat:** Die beste wissenschaftliche Evidenz für Rohstoffe wie Gold gibt es für
+> **Trendfolge/Momentum** (z. B. Moskowitz, Ooi & Pedersen, „Time Series Momentum“). Die Studien zeigen aber
+> auch, dass die Ergebnisse bei Rohstoffen seit etwa 2009 schwächer geworden sind. Der am häufigsten beschriebene
+> Gold-spezifische Ansatz ist der **Asien-Range-Breakout zur London-Eröffnung**. Dazu gibt es allerdings fast nur
+> Broker- und Trader-Blogs, keine unabhängigen Studien. Eine „beste“ Strategie mit Garantie gibt es nicht.
+> Deshalb stecken alle drei im Bot, und der Backtest entscheidet.
+
+Strategie A und B handeln **nur in Trendrichtung** und nur, wenn der Trend stark genug ist (ADX).
 
 **Strategie A – `trend_pullback` (Standard)**
 1. **Trend bestimmen:** Kurs über der 200er-EMA und 50er-EMA über 200er-EMA → Aufwärtstrend (umgekehrt: Abwärtstrend).
@@ -55,12 +64,38 @@ Der Bot kennt zwei Strategien. Beide handeln **nur in Trendrichtung** und nur, w
 4. **Nicht überhitzt:** RSI zwischen 40 und 70.
 5. → **Kaufen.** Für Verkaufen (Short) gelten die Regeln spiegelbildlich.
 
-**Strategie B – `breakout`**
+**Strategie B – `breakout` (Trendfolge)**
 Im Trend kauft der Bot, wenn der Kurs über das Hoch der letzten 20 Kerzen ausbricht (Short: unter das Tief).
+Das ist die klassische Trendfolge-Regel, auf der viele Trendfolge-Fonds aufbauen. Am besten zusammen mit dem
+**Trailing-Stop** (siehe unten), damit große Trends voll mitgenommen werden.
+
+**Strategie C – `session_breakout` (Asien-Range-Breakout)**
+1. Zwischen **23:00 und 07:00 UTC** (Asien-Session, ca. 0–8 Uhr deutsche Winterzeit) bewegt sich Gold oft nur in einer engen Spanne.
+2. Die Spanne muss **eng** sein: höchstens 35 % der durchschnittlichen Tagesspanne der letzten 14 Tage. Ist sie schon breit, ist die Energie meist verbraucht.
+3. Schließt eine Stundenkerze zwischen 07:00 und 12:00 UTC (London-Eröffnung) **erstmals** über der Spanne → Kaufen. Darunter → Verkaufen. Pro Tag zählt nur der erste Ausbruch.
+4. Der Stop liegt auf der anderen Seite der Spanne (mindestens 1 ATR).
+5. Empfehlung: `MAX_HOLD_BARS=10`, damit die Position spätestens am Abend geschlossen wird.
 
 **Stop-Loss und Gewinnziel** richten sich nach der aktuellen Schwankungsbreite (ATR):
 - Stop-Loss = 2 × ATR vom Einstieg entfernt
 - Gewinnziel = 3 × ATR → jeder Gewinner bringt etwa 1,5-mal so viel, wie ein Verlierer kostet.
+- **Optional: Trailing-Stop** (`TRAILING_ATR_MULT=3`): Der Stop wandert nach jeder Stunde hinter dem besten
+  Schlusskurs her (Abstand 3 × ATR), aber nie zurück. So werden Gewinne gesichert und große Trends laufen gelassen.
+  Mit `ATR_TARGET_MULT=0` gibt es gar kein festes Ziel mehr, und nur der Trailing-Stop beendet den Trade.
+- **Optional: Zeit-Ausstieg** (`MAX_HOLD_BARS`): Position nach x Kerzen schließen.
+
+**Wirtschaftskalender-Filter (Standard: AN)**
+Bei bestimmten US-Terminen springt Gold oft heftig, Spreads werden breit und Stops schlecht ausgeführt:
+- Zinsentscheide der US-Notenbank (FOMC)
+- Inflationsdaten (CPI)
+- Arbeitsmarktbericht (NFP)
+
+Der Bot eröffnet deshalb **60 Minuten vor bis 30 Minuten nach** jedem wichtigen USD-Termin keine neuen Trades.
+- Die Termine holt er sich stündlich aus dem kostenlosen Wochenkalender von **ForexFactory**.
+- Ist der Kalender nicht erreichbar, nutzt er eingebaute Regeln für FOMC und NFP. NFP ist dabei eine Näherung: immer der 1. Freitag im Monat.
+- Alle abgerufenen Termine speichert er in `data/calendar_events.csv`. Spätere Backtests kennen dadurch auch echte CPI-Termine. Für die Vergangenheit nutzt der Backtest die eingebauten FOMC/NFP-Regeln.
+- Offene Positionen bleiben über Termine hinweg bestehen. Ihr Stop-Loss schützt sie.
+- Mit `python bot.py news` siehst du die anstehenden Termine.
 
 **Risikomanagement (das Wichtigste):**
 - **Positionsgröße automatisch:** Jeder Trade riskiert genau **1 % des Kontos** (einstellbar). Bei 10.000 € heißt das: Wird der Stop getroffen, verlierst du ca. 100 €.
@@ -160,7 +195,9 @@ den echten Goldmarkt aus.
 ```
 python bot.py check
 ```
-Die Ausgabe sieht ungefähr so aus:
+Mit `python bot.py news` kannst du zusätzlich prüfen, ob der Wirtschaftskalender geladen wird.
+
+Die Ausgabe von `check` sieht ungefähr so aus:
 ```
 ✔ Verbunden mit Capital.com (DEMO)
   Konto: ... | Kontostand 10000.0 EUR | verfügbar 10000.0
@@ -180,8 +217,10 @@ python bot.py download --days 730
 Teste dann die Strategie:
 ```
 python bot.py backtest --data data/gold_HOUR.csv
-python bot.py backtest --data data/gold_HOUR.csv --strategy breakout
+python bot.py backtest --data data/gold_HOUR.csv --strategy breakout --trailing 3
+python bot.py backtest --data data/gold_HOUR.csv --strategy session_breakout --max-hold 10
 ```
+Mit `--no-news` siehst du, wie das Ergebnis ohne Kalender-Filter aussähe.
 So liest du das Ergebnis:
 
 | Kennzahl | Bedeutung | Gut, wenn … |
@@ -281,10 +320,17 @@ Alle Einstellungen stehen in der Datei `.env`:
 | `I_UNDERSTAND_LIVE_TRADING_RISK` | `NO` | Muss `YES` sein, damit Live-Handel möglich ist |
 | `EPIC` | `GOLD` | Markt-Kürzel bei Capital.com |
 | `RESOLUTION` | `HOUR` | Kerzengröße: `MINUTE_15`, `MINUTE_30`, `HOUR`, `HOUR_4`, `DAY` |
-| `STRATEGY` | `trend_pullback` | oder `breakout` |
+| `STRATEGY` | `trend_pullback` | oder `breakout` oder `session_breakout` |
 | `ADX_MIN` | `20` | Mindest-Trendstärke. Höher = weniger, aber sauberere Trades |
 | `ATR_STOP_MULT` | `2.0` | Stop-Abstand in ATR |
-| `ATR_TARGET_MULT` | `3.0` | Ziel-Abstand in ATR |
+| `ATR_TARGET_MULT` | `3.0` | Ziel-Abstand in ATR (0 = kein festes Ziel) |
+| `TRAILING_ATR_MULT` | `0` | Nachziehender Stop in ATR (0 = aus, typisch 3) |
+| `MAX_HOLD_BARS` | `0` | Position nach x Kerzen schließen (0 = aus) |
+| `SESSION_RANGE_MAX` | `0.35` | `session_breakout`: max. Größe der Asien-Spanne relativ zur Tagesspanne |
+| `NEWS_FILTER` | `ON` | Wirtschaftskalender-Filter an/aus |
+| `NEWS_MINUTES_BEFORE` / `_AFTER` | `60` / `30` | Sperrfenster um wichtige Termine |
+| `NEWS_CURRENCIES` | `USD` | Termine welcher Währungen (z. B. `USD,EUR`) |
+| `NEWS_IMPACT` | `High` | Wichtigkeit: `High`, oder `High,Medium` für mehr Vorsicht |
 | `RISK_PER_TRADE` | `0.01` | Risiko je Trade (0.01 = 1 %), maximal 0.05 erlaubt |
 | `MAX_DAILY_LOSS` | `0.03` | Tagesverlust-Bremse (0.03 = 3 %) |
 | `MAX_OPEN_POSITIONS` | `1` | Wie viele Gold-Positionen gleichzeitig |
@@ -307,6 +353,8 @@ Wenn du `RESOLUTION` änderst, lade die Daten neu herunter (`download`) und mach
 | `HTTP 429` | Zu viele Anfragen. Der Bot wartet automatisch und versucht es erneut. |
 | `Konto zu klein für Mindestgröße` | Das Konto ist zu klein, um bei 1 % Risiko die Mindestgröße zu handeln. Der Bot lässt den Trade dann absichtlich aus. |
 | Bot macht tagelang keinen Trade | Normal. Der Bot handelt nur bei klaren Signalen (im Backtest siehst du, wie oft das vorkommt). Am Wochenende ist der Goldmarkt geschlossen. |
+| `Wirtschaftskalender nicht abrufbar` | Internet/Firewall prüfen. Der Bot nutzt dann die eingebauten FOMC/NFP-Termine weiter. CPI-Termine fehlen in dem Fall. |
+| `Signal ignoriert: wichtiger Termin ...` | Gewollt: Der Kalender-Filter schützt vor Nachrichten-Spitzen. Abschalten mit `NEWS_FILTER=OFF` (nicht empfohlen). |
 | `Markt ist CLOSED` | Gold handelt etwa So 23 Uhr bis Fr 22 Uhr (UTC) mit einer täglichen kurzen Pause |
 
 ---
@@ -323,6 +371,7 @@ gold-trading-bot/
 │   ├── indicators.py      ← EMA, RSI, ATR, ADX
 │   ├── strategy.py        ← Die Handelsregeln
 │   ├── risk.py            ← Positionsgröße + Tagesverlust-Bremse
+│   ├── news_calendar.py   ← Wirtschaftskalender-Filter (FOMC, CPI, NFP …)
 │   ├── backtest.py        ← Test auf historischen Daten
 │   ├── optimize.py        ← Parameter-Suche mit Gegenprobe
 │   ├── data.py            ← Kursdaten laden/speichern

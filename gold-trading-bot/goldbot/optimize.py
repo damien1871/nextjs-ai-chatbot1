@@ -18,10 +18,12 @@ from .backtest import BacktestConfig, run_backtest
 from .strategy import StrategyParams
 
 GRID = {
-    "strategy": ["trend_pullback", "breakout"],
-    "adx_min": [15.0, 20.0, 25.0],
+    "strategy": ["trend_pullback", "breakout", "session_breakout"],
+    "adx_min": [15.0, 25.0],
     "atr_stop_mult": [1.5, 2.0, 2.5],
-    "atr_target_mult": [2.0, 3.0, 4.0],
+    # 0 = kein festes Ziel -> Gewinne laufen lassen (nur sinnvoll mit Trailing-Stop)
+    "atr_target_mult": [2.0, 3.0, 0.0],
+    "trailing_atr_mult": [0.0, 3.0],
 }
 
 
@@ -45,7 +47,12 @@ def optimize(
     rows = []
     keys = list(grid)
     for values in itertools.product(*(grid[k] for k in keys)):
-        params = replace(base, **dict(zip(keys, values)))
+        combo = dict(zip(keys, values))
+        if combo.get("atr_target_mult") == 0 and combo.get("trailing_atr_mult", base.trailing_atr_mult) == 0:
+            continue  # ohne Ziel UND ohne Trailing gäbe es nur Stop-Ausstiege
+        if combo.get("strategy") == "session_breakout" and combo.get("adx_min", base.adx_min) != grid["adx_min"][0]:
+            continue  # session_breakout nutzt keinen ADX -> nur einmal testen
+        params = replace(base, **combo)
         tr = run_backtest(train, params, cfg).stats
         rows.append({**dict(zip(keys, values)), "score": _score(tr), "train": tr, "params": params})
 
